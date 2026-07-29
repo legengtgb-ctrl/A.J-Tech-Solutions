@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Client Dashboard | AJ Tech</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+    />
+  </head>
+  <body>
+    <main class="dash">
+      <nav class="nav">
+        <div class="brand">
+          <img class="company-logo" src="/img/logo2.png" alt="AJ Tech Solutions" />
+        </div>
+        <div>
+          <button class="toggle" data-theme>◐</button>
+          <button class="outline" id="logout">Logout</button>
+        </div>
+      </nav>
+      <h1>Your dashboard</h1>
+      <p class="sub">Manage your profile and technology service requests.</p>
+      <section class="grid">
+        <article class="card">
+          <div class="profile">
+            <img
+              id="avatar"
+              class="avatar"
+              src="images/default-avatar.svg"
+              alt="Profile picture"
+            />
+            <div>
+              <h2 id="name">Loading…</h2>
+              <p class="sub" id="email"></p>
+            </div>
+          </div>
+          <hr style="border-color: var(--line); margin: 22px 0" />
+          <div class="info">
+            <span>Phone</span><b id="phone"></b><span>Account status</span
+            ><b id="status"></b><span>Member since</span><b id="created"></b
+            ><span>Last sign in</span><b id="last"></b>
+          </div>
+        </article>
+        <article class="card">
+          <h2>Submit a service request</h2>
+          <form id="request">
+            <div class="field">
+              <label>Service</label
+              ><select class="input" name="service">
+                <option>IT Consultation</option>
+                <option>Web Development</option>
+                <option>Cloud Services</option>
+                <option>Technical Support</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>How can we help?</label
+              ><textarea class="input" name="details" rows="4"></textarea>
+            </div>
+            <button class="btn">Submit request</button>
+          </form>
+        </article>
+        <article class="card">
+          <h2>Edit profile</h2>
+          <form id="profile">
+            <div class="field">
+              <label>Profile image (drag/drop or select)</label
+              ><input
+                class="input"
+                type="file"
+                name="profilePicture"
+                accept="image/*"
+              />
+            </div>
+            <div class="field">
+              <label>Name</label
+              ><input class="input" name="fullName" required />
+            </div>
+            <div class="field">
+              <label>Email</label
+              ><input class="input" type="email" name="email" required />
+            </div>
+            <div class="field">
+              <label>Phone</label><input class="input" name="phone" required />
+            </div>
+            <button class="btn">Save profile</button>
+          </form>
+        </article>
+        <article class="card">
+          <h2>Request history</h2>
+          <ul class="request-list" id="requests">
+            <li class="sub">Loading requests…</li>
+          </ul>
+        </article>
+      </section>
+    </main>
+    <script src="js/app.js"></script>
+    <script>
+      let user;
+      async function load() {
+        try {
+          let d = await api("/api/user/profile");
+          user = d.user;
+          if (user.role === "admin")
+            return (location = "/admin-dashboard.html");
+          for (let k of ["fullName", "email", "phone"])
+            profile.elements[k].value =
+              user[k === "fullName" ? "full_name" : k];
+          name.textContent = user.full_name;
+          email.textContent = user.email;
+          phone.textContent = user.phone;
+          status.textContent = user.account_status;
+          created.textContent = new Date(user.created_at).toLocaleDateString();
+          last.textContent = user.last_login
+            ? new Date(user.last_login).toLocaleString()
+            : "—";
+          avatar.src = user.profile_picture;
+          let r = await api("/api/user/requests");
+          requests.innerHTML = r.requests.length
+            ? r.requests
+                .map(
+                  (x) =>
+                    `<li><b>${x.service}</b><br><small class="sub">${x.status} · ${new Date(x.created_at).toLocaleDateString()}</small></li>`,
+                )
+                .join("")
+            : '<li class="sub">No requests yet.</li>';
+        } catch (e) {
+          toast(e.message);
+        }
+      }
+      load();
+      profile.onsubmit = async (e) => {
+        e.preventDefault();
+        try {
+          let d = await api("/api/user/profile", {
+            method: "PUT",
+            body: new FormData(profile),
+          });
+          toast(d.message, true);
+          load();
+        } catch (x) {
+          toast(x.message);
+        }
+      };
+      request.onsubmit = async (e) => {
+        e.preventDefault();
+        try {
+          let d = await api("/api/user/requests", {
+            method: "POST",
+            body: JSON.stringify(formData(request)),
+          });
+          toast(d.message, true);
+          request.reset();
+          load();
+        } catch (x) {
+          toast(x.message);
+        }
+      };
+      logout.onclick = async () => {
+        await api("/api/auth/logout", { method: "POST" });
+        location = "/login.html";
+      };
+    </script>
+  </body>
+</html>

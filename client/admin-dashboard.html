@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Admin Operations | AJ Tech</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <main class="dash">
+      <nav class="nav">
+        <div class="brand">
+          <img
+            class="company-logo"
+            src="/img/logo2.png"
+            alt="AJ Tech Solutions"
+          />
+        </div>
+        <div>
+          <button class="toggle" data-theme>Theme</button>
+          <button class="outline" id="logout">Logout</button>
+        </div>
+      </nav>
+      <h1>Admin operations</h1>
+      <p class="sub">
+        Review client work before it becomes visible, control invoices, and
+        oversee account activity.
+      </p>
+      <section class="grid" id="metrics">
+        <article class="card">
+          <span class="sub">Awaiting review</span>
+          <h2 id="pendingCount">—</h2>
+        </article>
+        <article class="card">
+          <span class="sub">Approved / active</span>
+          <h2 id="activeCount">—</h2>
+        </article>
+        <article class="card">
+          <span class="sub">Client accounts</span>
+          <h2 id="clientCount">—</h2>
+        </article>
+        <article class="card">
+          <span class="sub">Invoices issued</span>
+          <h2 id="invoiceCount">—</h2>
+        </article>
+      </section>
+      <section class="grid admin-workspace">
+        <article class="card admin-requests-card">
+          <div class="row">
+            <div>
+              <h2>Request approval queue</h2>
+              <p class="sub">
+                Only approved, rejected, or updated requests are shown to the
+                client.
+              </p>
+            </div>
+            <button class="outline" onclick="load()">Refresh</button>
+          </div>
+          <div id="requests" class="request-list"></div>
+          <form id="requestUpdateForm" class="admin-form is-hidden">
+            <h3 id="requestEditorTitle">Update request</h3>
+            <input type="hidden" id="requestEditorId" />
+            <div class="admin-form-grid">
+              <label>Request status<select class="input" id="requestEditorStatus"><option value="approved">Approved</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="rejected">Rejected</option></select></label>
+              <label>Progress (%)<input class="input" id="requestEditorProgress" type="number" min="0" max="100" /></label>
+            </div>
+            <label>Client update<textarea class="input" id="requestEditorNote" rows="3" placeholder="Add a clear update for the client"></textarea></label>
+            <div class="admin-form-actions"><button class="outline" type="button" onclick="closeRequestEditor()">Cancel</button><button class="btn admin-submit" type="submit">Save request update</button></div>
+          </form>
+        </article>
+        <article class="card admin-support-card">
+          <h2>Client support chat</h2>
+          <p class="sub">Open a conversation and reply directly to a client.</p>
+          <div class="admin-chat-layout">
+            <div id="supportConversations" class="request-list admin-chat-list"></div>
+            <div class="admin-chat-window">
+              <div id="adminSupportMessages" class="admin-chat-messages"><p class="sub">Choose a client conversation to begin.</p></div>
+              <form id="adminSupportForm" class="admin-chat-form">
+                <input class="input" id="adminSupportMessage" maxlength="2000" placeholder="Choose a conversation first" disabled required />
+                <button class="btn admin-submit" type="submit" disabled>Send reply</button>
+              </form>
+            </div>
+          </div>
+        </article>
+        <article class="card admin-invoices-card">
+          <div class="row">
+            <div>
+              <h2>Invoice control</h2>
+              <p class="sub">
+                Create invoices only for reviewed requests. Draft invoices
+                remain internal.
+              </p>
+            </div>
+            <button
+              class="btn"
+              style="width: auto; padding: 10px 16px"
+              onclick="createInvoice()"
+            >
+              Create invoice
+            </button>
+          </div>
+          <div id="invoices" class="request-list"></div>
+          <form id="invoiceForm" class="admin-form is-hidden">
+            <h3>Create invoice</h3>
+            <div class="admin-form-grid">
+              <label>Reviewed request
+                <select class="input invoice-request-select" id="invoiceRequestId" required aria-label="Reviewed request">
+                  <option value="" selected disabled>Select a reviewed request</option>
+                </select>
+              </label>
+              <label>Amount<input class="input" id="invoiceAmount" placeholder="e.g. ₦250,000" required /></label>
+              <label>Due date<input class="input" id="invoiceDueDate" type="date" /></label>
+              <label>Invoice status<select class="input" id="invoiceStatus"><option value="sent">Send to client</option><option value="draft">Save as draft</option></select></label>
+            </div>
+            <label>Notes<textarea class="input" id="invoiceNotes" rows="3" placeholder="Optional payment or service notes"></textarea></label>
+            <div class="admin-form-actions"><button class="outline" type="button" onclick="invoiceForm.classList.add('is-hidden')">Cancel</button><button class="btn admin-submit" type="submit">Create invoice</button></div>
+          </form>
+        </article>
+        <article class="card admin-users-card">
+          <h2>Client accounts</h2>
+          <div id="users" class="request-list"></div>
+        </article>
+        <article class="card admin-activity-card">
+          <h2>Administrative activity</h2>
+          <div class="table-wrap">
+            <table class="activity-table">
+              <thead><tr><th>User</th><th>Activity</th><th>Date &amp; time</th></tr></thead>
+              <tbody id="adminActivityBody"></tbody>
+            </table>
+          </div>
+          <div class="admin-form-actions"><button class="outline" id="moreActivity" type="button">View older activity</button></div>
+        </article>
+        <article class="card admin-profile-card">
+          <h2>My admin profile</h2>
+          <p class="sub">Keep your administrator contact details current.</p>
+          <form id="adminProfileForm" class="admin-form">
+            <div class="admin-form-grid">
+              <label>Full name<input class="input" name="fullName" required /></label>
+              <label>Email address<input class="input" name="email" type="email" required /></label>
+              <label>Phone number<input class="input" name="phone" required /></label>
+              <label>Profile image<input class="input" name="profilePicture" type="file" accept="image/*" /></label>
+            </div>
+            <div class="admin-form-actions"><button class="btn admin-submit" type="submit">Save profile</button></div>
+          </form>
+        </article>
+      </section>
+    </main>
+    <script src="js/app.js"></script>
+    <script>
+      const safe = (value) =>
+        String(value ?? "").replace(
+          /[&<>'"]/g,
+          (char) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              "'": "&#39;",
+              '"': "&quot;",
+            })[char],
+        );
+      let allRequests = [];
+      let selectedClientId = null;
+      let allActivity = [];
+      let visibleActivity = 10;
+      const date = (value) => (value ? new Date(value).toLocaleString() : "—");
+      async function load() {
+        try {
+          const [requestData, invoiceData, userData, activityData, supportData, profileData] =
+            await Promise.all([
+              api("/api/admin/requests"),
+              api("/api/admin/invoices"),
+              api("/api/admin/users"),
+              api("/api/admin/activity"),
+              api("/api/admin/support/conversations"),
+              api("/api/user/profile"),
+            ]);
+          allRequests = requestData.requests;
+          pendingCount.textContent = allRequests.filter(
+            (item) => item.status === "pending_review",
+          ).length;
+          activeCount.textContent = allRequests.filter((item) =>
+            ["approved", "in_progress"].includes(item.status),
+          ).length;
+          clientCount.textContent = userData.users.filter(
+            (item) => item.role === "client",
+          ).length;
+          invoiceCount.textContent = invoiceData.invoices.length;
+          adminProfileForm.fullName.value = profileData.user.full_name;
+          adminProfileForm.email.value = profileData.user.email;
+          adminProfileForm.phone.value = profileData.user.phone;
+          supportConversations.innerHTML = supportData.conversations.map((item) =>
+            `<div class="request-row"><div><b>${safe(item.full_name)}</b><br><span class="sub">${safe(item.email)} · ${safe(item.last_message || "")}</span></div><button class="outline" onclick="openConversation(${item.client_id})">Open chat</button></div>`,
+          ).join("") || '<p class="sub">No client support messages yet.</p>';
+          requests.innerHTML =
+            allRequests
+              .map(
+                (item) =>
+                  `<div class="request-row"><div><b>${safe(item.service)}</b> <span class="sub">#${item.id} · ${safe(item.status)}</span><br><span class="sub">${safe(item.full_name)} · ${safe(item.email)} · ${date(item.created_at)}</span><p>${safe(item.details || "No client notes.")}</p>${item.admin_note ? `<p class="success">Admin note: ${safe(item.admin_note)}</p>` : ""}</div><div class="row"><button class="outline" onclick="review(${item.id},'approved')">Approve</button><button class="outline" onclick="review(${item.id},'rejected')">Reject</button><button class="outline" onclick="review(${item.id},'in_progress')">Progress</button></div></div>`,
+              )
+              .join("") || '<p class="sub">No requests.</p>';
+          allRequests.forEach((item, index) => {
+            const requestRow = requests.querySelectorAll(".request-row")[index];
+            if (item.status === "rejected") {
+              requestRow.innerHTML = `<div><b>${safe(item.service)}</b><p class="danger">Request status: Rejected</p><p class="sub">Reason: ${safe(item.admin_note || "No reason provided.")}</p></div>`;
+              requestRow.classList.add("rejected-request");
+              return;
+            }
+            const details = requestRow?.firstElementChild;
+            if (!details) return;
+            const actions = requestRow.querySelector(".row");
+            if (item.status !== "pending_review")
+              [...actions.querySelectorAll("button")].find((button) => button.textContent === "Approve")?.remove();
+            actions?.classList.add("request-actions");
+            actions?.querySelectorAll("button").forEach((button, buttonIndex) => {
+              button.classList.add(["action-approve", "action-reject", "action-progress"][buttonIndex]);
+            });
+            actions?.insertAdjacentHTML(
+              "beforeend",
+              `<button class="outline action-complete" onclick="review(${item.id},'completed')">Complete</button>`,
+            );
+            details.insertAdjacentHTML(
+              "beforeend",
+              `<p class="sub"><b>Request ID: REQ-${item.id}</b> · Progress: ${item.progress || 0}%</p><div class="progress-bar"><i style="width:${item.progress || 0}%"></i></div>`,
+            );
+          });
+          invoices.innerHTML =
+            invoiceData.invoices
+              .map(
+                (item) =>
+                  `<div class="request-row"><div><b>${safe(item.invoice_number)}</b> · ${safe(item.full_name)}<br><span class="sub">${safe(item.service)} · ${safe(item.amount)} · ${safe(item.status)} · Due: ${date(item.due_date)}</span></div></div>`,
+              )
+              .join("") || '<p class="sub">No invoices created.</p>';
+          users.innerHTML =
+            userData.users
+              .map(
+                (item) =>
+                  `<div class="request-row"><div><b>${safe(item.full_name)}</b> <span class="sub">@${safe(item.username)} · ${safe(item.email)} · ${safe(item.role)} · ${safe(item.account_status)}</span>${item.role === "client" ? `<br><label class="sub">Client tier <select class="input" onchange="setClientTier(${item.id}, this.value)"><option${item.client_tier === "Premium Client" ? " selected" : ""}>Premium Client</option><option${item.client_tier === "Standard Client" ? " selected" : ""}>Standard Client</option><option${item.client_tier === "Regular Client" ? " selected" : ""}>Regular Client</option></select></label>` : ""}</div><button class="outline" onclick="toggleUser(${item.id}, '${item.account_status === "active" ? "inactive" : "active"}')">${item.account_status === "active" ? "Deactivate" : "Activate"}</button></div>`,
+              )
+              .join("") || '<p class="sub">No users.</p>';
+          allActivity = activityData.activity;
+          renderActivity();
+          /*
+            activityData.activity
+              .map(
+                (item) =>
+                  `<div class="request-row"><span><b>${safe(item.full_name || "System")}</b> — ${safe(item.action)}</span><span class="sub">${date(item.created_at)}</span></div>`,
+              )
+              .join("") || '<p class="sub">No recorded activity.</p>';
+          */
+        } catch (error) {
+          toast(error.message);
+        }
+      }
+      function renderActivity() {
+        const activityToShow = allActivity.slice(0, visibleActivity);
+        adminActivityBody.innerHTML = activityToShow
+          .map(
+            (item) =>
+              `<tr><td>${safe(item.full_name || "System")}</td><td>${safe(item.action)}</td><td>${date(item.created_at)}</td></tr>`,
+          )
+          .join("") || '<tr><td colspan="3" class="sub">No recorded activity.</td></tr>';
+        moreActivity.hidden = visibleActivity >= allActivity.length;
+      }
+      async function review(id, status) {
+        const request = allRequests.find((item) => item.id === id);
+        if (!request) return;
+        requestEditorId.value = request.id;
+        requestEditorTitle.textContent = `Update request REQ-${request.id}`;
+        requestEditorStatus.value = status;
+        requestEditorProgress.value = status === "completed" ? 100 : request.progress || 0;
+        requestEditorNote.value = request.admin_note || "";
+        requestUpdateForm.classList.remove("is-hidden");
+        requestUpdateForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+      function closeRequestEditor() { requestUpdateForm.classList.add("is-hidden"); }
+      requestUpdateForm.onsubmit = async (event) => {
+        event.preventDefault();
+        const id = Number(requestEditorId.value);
+        const status = requestEditorStatus.value;
+        const progress = Number(requestEditorProgress.value);
+        if (!Number.isInteger(progress) || progress < 0 || progress > 100)
+          return toast("Progress must be a whole number from 0 to 100.");
+        try {
+          toast(
+            (
+              await api(`/api/admin/requests/${id}`, {
+                method: "PATCH",
+                body: JSON.stringify({ status, adminNote: requestEditorNote.value.trim(), progress }),
+              })
+            ).message,
+            true,
+          );
+          closeRequestEditor();
+          load();
+        } catch (error) {
+          toast(error.message);
+        }
+      };
+      async function openConversation(clientId) {
+        try {
+          const data = await api(`/api/admin/support/conversations/${clientId}/messages`);
+          selectedClientId = clientId;
+          adminSupportMessages.innerHTML = data.messages.map((message) =>
+            `<div class="admin-chat-message ${message.sender_role === "admin" ? "admin" : ""}"><b>${safe(message.sender_name)}</b><p>${safe(message.body)}</p><small>${date(message.created_at)}</small></div>`,
+          ).join("") || '<p class="sub">No messages in this conversation.</p>';
+          adminSupportMessage.disabled = false;
+          adminSupportMessage.placeholder = "Write a helpful reply";
+          adminSupportForm.querySelector("button").disabled = false;
+          adminSupportMessages.scrollTop = adminSupportMessages.scrollHeight;
+        } catch (error) { toast(error.message); }
+      }
+      adminSupportForm.onsubmit = async (event) => {
+        event.preventDefault();
+        if (!selectedClientId) return;
+        try {
+          const result = await api(`/api/admin/support/conversations/${selectedClientId}/messages`, {
+            method: "POST", body: JSON.stringify({ body: adminSupportMessage.value }),
+          });
+          adminSupportForm.reset();
+          toast(result.message, true);
+          openConversation(selectedClientId);
+        } catch (error) { toast(error.message); }
+      };
+      adminProfileForm.onsubmit = async (event) => {
+        event.preventDefault();
+        try {
+          const result = await api("/api/user/profile", { method: "PUT", body: new FormData(adminProfileForm) });
+          toast(result.message, true);
+          load();
+        } catch (error) { toast(error.message); }
+      };
+      async function createInvoice() {
+        const reviewed = allRequests.filter(
+          (item) => item.status !== "pending_review",
+        );
+        if (!reviewed.length)
+          return toast("Review a client request before creating an invoice.");
+        const requestId = prompt(
+          `Request ID to invoice: ${reviewed.map((item) => item.id).join(", ")}`,
+        );
+        const amount =
+          requestId && prompt("Invoice amount (for example: ₦250,000):");
+        if (!requestId || !amount) return;
+        const dueDate = prompt("Due date (YYYY-MM-DD, optional):") || null;
+        const notes = prompt("Invoice notes (optional):") || "";
+        try {
+          toast(
+            (
+              await api("/api/admin/invoices", {
+                method: "POST",
+                body: JSON.stringify({
+                  requestId,
+                  amount,
+                  dueDate,
+                  notes,
+                  status: "sent",
+                }),
+              })
+            ).message,
+            true,
+          );
+          load();
+        } catch (error) {
+          toast(error.message);
+        }
+      }
+      // Replace browser prompts with the invoice form above.
+      async function createInvoice() {
+        const reviewed = allRequests.filter((item) => item.status !== "pending_review");
+        if (!reviewed.length)
+          return toast("Review a client request before creating an invoice.");
+        invoiceRequestId.innerHTML = '<option value="" selected disabled>Select a reviewed request</option>' + reviewed.map((item) =>
+          `<option value="${item.id}">REQ-${item.id} — ${safe(item.service)} (${safe(item.full_name)})</option>`,
+        ).join("");
+        invoiceForm.classList.remove("is-hidden");
+        invoiceForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+      invoiceForm.onsubmit = async (event) => {
+        event.preventDefault();
+        try {
+          const result = await api("/api/admin/invoices", {
+            method: "POST",
+            body: JSON.stringify({
+              requestId: invoiceRequestId.value,
+              amount: invoiceAmount.value.trim(),
+              dueDate: invoiceDueDate.value || null,
+              notes: invoiceNotes.value.trim(),
+              status: invoiceStatus.value,
+            }),
+          });
+          invoiceForm.reset();
+          invoiceForm.classList.add("is-hidden");
+          toast(result.message, true);
+          load();
+        } catch (error) { toast(error.message); }
+      };
+      async function toggleUser(id, accountStatus) {
+        try {
+          toast(
+            (
+              await api(`/api/admin/users/${id}`, {
+                method: "PATCH",
+                body: JSON.stringify({ accountStatus }),
+              })
+            ).message,
+            true,
+          );
+          load();
+        } catch (error) {
+          toast(error.message);
+        }
+      }
+      async function setClientTier(id, clientTier) {
+        try {
+          toast(
+            (
+              await api(`/api/admin/users/${id}`, {
+                method: "PATCH",
+                body: JSON.stringify({ clientTier }),
+              })
+            ).message,
+            true,
+          );
+          load();
+        } catch (error) {
+          toast(error.message);
+        }
+      }
+      moreActivity.onclick = () => {
+        visibleActivity += 10;
+        renderActivity();
+      };
+      logout.onclick = async () => {
+        await api("/api/auth/logout", { method: "POST" });
+        location = "/login.html";
+      };
+      load();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Super Admin | AJ Tech</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <main class="dash">
+      <nav class="nav">
+        <div class="brand">
+          <img
+            class="company-logo"
+            src="/img/logo2.png"
+            alt="AJ Tech Solutions"
+          />
+        </div>
+        <div>
+          <button class="toggle" data-theme>Theme</button>
+          <button class="outline" id="logout">Logout</button>
+        </div>
+      </nav>
+      <h1>Super Admin control center</h1>
+      <p class="sub">
+        Approve administrator access before any admin can enter AJ Tech
+        operations.
+      </p>
+      <section class="grid">
+        <article class="card">
+          <span class="sub">Awaiting approval</span>
+          <h2 id="pending">—</h2>
+        </article>
+        <article class="card">
+          <span class="sub">Approved admins</span>
+          <h2 id="approved">—</h2>
+        </article>
+      </section>
+      <section class="grid" style="margin-top: 20px">
+        <article class="card" style="grid-column: 1/-1">
+          <h2>Pending admin approvals</h2>
+          <p class="sub">Review and approve administrator registration requests.</p>
+          <div id="pendingApprovals" class="request-list"></div>
+        </article>
+      </section>
+      <section class="grid" style="margin-top: 20px">
+        <article class="card" style="grid-column: 1/-1">
+          <h2>Administrator registrations</h2>
+          <p class="sub">
+            Approve new registrations and manage every administrator account.
+          </p>
+          <div id="admins" class="request-list"></div>
+        </article>
+        <article class="card" style="grid-column: 1/-1">
+          <h2>My profile</h2>
+          <form id="profileForm" class="grid">
+            <div class="field">
+              <label>Full name</label
+              ><input class="input" name="fullName" required />
+            </div>
+            <div class="field">
+              <label>Email</label
+              ><input class="input" type="email" name="email" required />
+            </div>
+            <div class="field">
+              <label>Phone</label><input class="input" name="phone" required />
+            </div>
+            <div class="field">
+              <label>Profile image</label
+              ><input
+                class="input"
+                type="file"
+                name="profilePicture"
+                accept="image/*"
+              />
+            </div>
+            <button class="btn" type="submit">Save my profile</button>
+          </form>
+        </article>
+      </section>
+    </main>
+    <script src="js/app.js"></script>
+    <script>
+      const esc = (value) =>
+        String(value ?? "").replace(
+          /[&<>'"]/g,
+          (char) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              "'": "&#39;",
+              '"': "&quot;",
+            })[char],
+        );
+      async function load() {
+        try {
+          const [list, profile] = await Promise.all([
+            api("/api/super-admin/admins"),
+            api("/api/user/profile"),
+          ]);
+          if (profile.user.role !== "super_admin")
+            return (location = "/login.html");
+          pending.textContent = list.admins.filter(
+            (x) => !x.admin_approved && x.account_status === "active",
+          ).length;
+          approved.textContent = list.admins.filter(
+            (x) => x.admin_approved && x.account_status === "active",
+          ).length;
+          const awaiting = list.admins.filter(
+            (x) => !x.admin_approved && x.account_status === "active",
+          );
+          pendingApprovals.innerHTML = awaiting.map((admin) =>
+            `<div class="request-row"><div><b>${esc(admin.full_name)}</b><br><span class="sub">${esc(admin.email)} · Registered ${new Date(admin.created_at).toLocaleString()}</span></div><div class="row"><button class="btn" onclick="review(${admin.id},true)">Approve admin</button></div></div>`,
+          ).join("") || '<p class="sub">There are no admin registrations awaiting approval.</p>';
+          admins.innerHTML =
+            list.admins
+              .map(
+                (x) =>
+                  `<div class="request-row"><div><b>${esc(x.full_name)}</b> <span class="sub">${esc(x.email)} · ${x.admin_approved ? "Approved" : x.account_status === "inactive" ? "Rejected" : "Awaiting approval"}</span><br><small class="sub">Registered ${new Date(x.created_at).toLocaleString()}</small></div><div class="row"><button class="outline" onclick="review(${x.id},true)">Approve</button><button class="outline" onclick="review(${x.id},false)">Reject</button></div></div>`,
+              )
+              .join("") || '<p class="sub">No administrator registrations.</p>';
+          list.admins.forEach((admin, index) => {
+            const row = admins.querySelectorAll(".request-row")[index];
+            const actions = row?.querySelector(".row");
+            if (!actions) return;
+            const status = admin.account_status === "active"
+              ? admin.admin_approved ? "Active" : "Awaiting approval"
+              : "Deactivated";
+            row.querySelector(".sub").textContent = `${admin.email} · ${status}`;
+            const buttons = actions.querySelectorAll("button");
+            if (admin.account_status === "active") {
+              if (admin.admin_approved) buttons[0]?.remove();
+              const deactivate = actions.querySelector("button");
+              if (deactivate) deactivate.textContent = "Deactivate";
+            } else {
+              buttons[1]?.remove();
+              actions.insertAdjacentHTML("beforeend", `<button class="outline" onclick="manage(${admin.id},'reactivate')">Reactivate</button>`);
+            }
+            actions.insertAdjacentHTML("beforeend", `<button class="outline" onclick="removeAdmin(${admin.id})">Delete</button>`);
+          });
+          for (const key of ["fullName", "email", "phone"])
+            profileForm.elements[key].value =
+              profile.user[key === "fullName" ? "full_name" : key];
+        } catch (error) {
+          toast(error.message);
+        }
+      }
+      async function review(id, approved) {
+        if (
+          !confirm(
+            approved
+              ? "Approve this administrator?"
+              : "Reject and deactivate this administrator?",
+          )
+        )
+          return;
+        try {
+          toast(
+            (
+              await api(`/api/super-admin/admins/${id}`, {
+                method: "PATCH",
+                body: JSON.stringify({ approved }),
+              })
+            ).message,
+            true,
+          );
+          load();
+        } catch (error) {
+          toast(error.message);
+        }
+      }
+      async function manage(id, action) {
+        const verb = action === "reactivate" ? "reactivate" : "deactivate";
+        if (!confirm(`Are you sure you want to ${verb} this administrator?`)) return;
+        try {
+          toast((await api(`/api/super-admin/admins/${id}`, {
+            method: "PATCH", body: JSON.stringify({ action }),
+          })).message, true);
+          load();
+        } catch (error) { toast(error.message); }
+      }
+      async function removeAdmin(id) {
+        if (!confirm("Delete this administrator account permanently? This cannot be undone.")) return;
+        try {
+          toast((await api(`/api/super-admin/admins/${id}`, { method: "DELETE" })).message, true);
+          load();
+        } catch (error) { toast(error.message); }
+      }
+      profileForm.onsubmit = async (event) => {
+        event.preventDefault();
+        try {
+          toast(
+            (
+              await api("/api/user/profile", {
+                method: "PUT",
+                body: new FormData(profileForm),
+              })
+            ).message,
+            true,
+          );
+        } catch (error) {
+          toast(error.message);
+        }
+      };
+      logout.onclick = async () => {
+        await api("/api/auth/logout", { method: "POST" });
+        location = "/login.html";
+      };
+      load();
+    </script>
+  </body>
+</html>
