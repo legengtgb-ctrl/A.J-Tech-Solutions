@@ -1,12 +1,11 @@
 require("dotenv").config();
 const express = require("express"),
   session = require("express-session"),
-  SQLiteStore = require("connect-sqlite3")(session),
-  sqlite3 = require("sqlite3").verbose(),
+  PgSession = require("connect-pg-simple")(session),
   helmet = require("helmet"),
   path = require("path"),
   fs = require("fs");
-const { initialize } = require("./server/config/database");
+const { initialize, pool } = require("./server/config/database");
 const { csrf, sanitize, csrfToken } = require("./server/middleware/security");
 const app = express();
 const uploads = path.join(__dirname, "server/uploads");
@@ -22,8 +21,10 @@ app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ extended: false }));
 app.use(
   session({
-    store: new SQLiteStore({
-      db: new sqlite3.Database(path.join(__dirname, "database", "sessions.db")),
+    store: new PgSession({
+      pool,
+      tableName: "web_sessions",
+      createTableIfMissing: true,
     }),
     name: "ajtech.sid",
     secret: process.env.SESSION_SECRET || "replace-this-development-secret",
@@ -40,6 +41,14 @@ app.use(
 app.use(sanitize);
 app.use(csrf);
 app.get("/api/csrf-token", csrfToken);
+app.get("/healthz", async (req, res) => {
+  try {
+    await pool.query("SELECT 1");
+    res.json({ status: "ok" });
+  } catch {
+    res.status(503).json({ status: "unavailable" });
+  }
+});
 app.use("/api/auth", require("./server/routes/authRoutes"));
 app.use("/api/user", require("./server/routes/userRoutes"));
 app.use("/api/admin", require("./server/routes/adminRoutes"));
@@ -65,4 +74,8 @@ initialize()
       ),
     ),
   )
-  .catch(console.error);
+  .catch(async (error) => {
+    console.error("Application startup failed:", error);
+    await pool.end();
+    process.exitCode = 1;
+  });

@@ -47,11 +47,11 @@ const sendEmail = async ({ to, subject, html, text }) => {
 };
 const saveCode = async (userId, code, tableName, expiryMinutes, hashColumn) => {
   const codeHash = hashValue(code);
-  const expiresSql = `datetime('now', '+${expiryMinutes} minutes')`;
+  const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000).toISOString();
   await run(`DELETE FROM ${tableName} WHERE user_id=?`, [userId]);
   await run(
-    `INSERT INTO ${tableName}(user_id,${hashColumn},expires_at) VALUES(?,?,${expiresSql})`,
-    [userId, codeHash],
+    `INSERT INTO ${tableName}(user_id,${hashColumn},expires_at) VALUES(?,?,?)`,
+    [userId, codeHash, expiresAt],
   );
 };
 const verifyStoredCode = async (userId, code, tableName, hashColumn) => {
