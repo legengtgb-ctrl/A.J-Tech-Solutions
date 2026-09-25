@@ -6,10 +6,9 @@ Neon hosts PostgreSQL; Render runs the Express app. The app creates its tables o
 
 1. Create a Neon project and database.
 2. Copy the pooled connection string from Neon and keep it private. It should use SSL (`sslmode=require`).
-3. Before deploying the app, import local data from this project directory while the local SQLite database is available:
+3. Before deploying the app, put the Neon URL in the ignored local `.env` file as `DATABASE_URL`, then import while the local SQLite database is available:
 
    ```powershell
-   $env:DATABASE_URL = "<Neon pooled connection string>"
    npm run db:import:sqlite
    ```
 
