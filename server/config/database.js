@@ -28,12 +28,12 @@ async function migrateUsersForRoles() {
     email TEXT NOT NULL UNIQUE, phone TEXT NOT NULL, password_hash TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'client' CHECK(role IN ('super_admin','admin','client')),
     profile_picture TEXT DEFAULT '/images/default-avatar.svg', account_status TEXT NOT NULL DEFAULT 'active'
-    CHECK(account_status IN ('active','inactive')), email_verified INTEGER DEFAULT 0,
+    CHECK(account_status IN ('active','inactive')),
     failed_login_attempts INTEGER DEFAULT 0, locked_until DATETIME, admin_approved INTEGER NOT NULL DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, last_login DATETIME
   )`);
-  await run(`INSERT INTO users_role_migration(id,full_name,username,email,phone,password_hash,role,profile_picture,account_status,email_verified,failed_login_attempts,locked_until,admin_approved,created_at,updated_at,last_login)
-    SELECT id,full_name,username,email,phone,password_hash,role,profile_picture,account_status,email_verified,failed_login_attempts,locked_until,1,created_at,updated_at,last_login FROM users`);
+  await run(`INSERT INTO users_role_migration(id,full_name,username,email,phone,password_hash,role,profile_picture,account_status,failed_login_attempts,locked_until,admin_approved,created_at,updated_at,last_login)
+    SELECT id,full_name,username,email,phone,password_hash,role,profile_picture,account_status,failed_login_attempts,locked_until,1,created_at,updated_at,last_login FROM users`);
   await run("DROP TABLE users");
   await run("ALTER TABLE users_role_migration RENAME TO users");
   await run("PRAGMA foreign_keys = ON");
@@ -88,6 +88,7 @@ async function initialize() {
       "ALTER TABLE users ADD COLUMN client_tier TEXT NOT NULL DEFAULT 'Regular Client' CHECK(client_tier IN ('Premium Client','Standard Client','Regular Client'))",
     );
   }
+  await run("DROP TABLE IF EXISTS email_verification_codes");
   await run(
     "UPDATE service_requests SET status='pending_review' WHERE status='pending'",
   );

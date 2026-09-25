@@ -5,7 +5,7 @@ async function requireAuth(req, res, next) {
       .status(401)
       .json({ message: "Please log in to continue.", redirect: "/login.html" });
   const user = await get(
-    "SELECT id, full_name, username, email, phone, role, profile_picture, client_tier, account_status, admin_approved, email_verified, created_at, last_login FROM users WHERE id=?",
+    "SELECT id, full_name, username, email, phone, role, profile_picture, client_tier, account_status, admin_approved, created_at, last_login FROM users WHERE id=?",
     [req.session.userId],
   );
   if (!user || user.account_status !== "active") {

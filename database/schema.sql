@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
  role TEXT NOT NULL DEFAULT 'client' CHECK(role IN ('super_admin','admin','client')),
  profile_picture TEXT DEFAULT '/images/default-avatar.svg', client_tier TEXT NOT NULL DEFAULT 'Regular Client'
  CHECK(client_tier IN ('Premium Client','Standard Client','Regular Client')), account_status TEXT NOT NULL DEFAULT 'active'
- CHECK(account_status IN ('active','inactive')), email_verified INTEGER DEFAULT 0,
+ CHECK(account_status IN ('active','inactive')),
  failed_login_attempts INTEGER DEFAULT 0, locked_until DATETIME, admin_approved INTEGER NOT NULL DEFAULT 1, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, last_login DATETIME
 );

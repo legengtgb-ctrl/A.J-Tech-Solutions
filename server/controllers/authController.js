@@ -1,16 +1,78 @@
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 const validator = require("validator");
 const { run, get } = require("../config/database");
 const strong = (p) =>
   typeof p === "string" &&
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(p);
+const hashValue = (value) =>
+  crypto.createHash("sha256").update(String(value)).digest("hex");
+const codeFrom = (digits = 6) =>
+  String(Math.floor(10 ** (digits - 1) + Math.random() * 9 * 10 ** (digits - 1))).padStart(digits, "0");
 const log = (id, action, req) =>
   run("INSERT INTO activity_logs (user_id,action,ip_address) VALUES (?,?,?)", [
     id,
     action,
     req.ip,
   ]).catch(() => {});
+const getTransporter = () => {
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!host || !user || !pass) return null;
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+};
+const sendEmail = async ({ to, subject, html, text }) => {
+  const transporter = getTransporter();
+  if (!transporter) {
+    console.info(`EMAIL SIMULATION: ${subject} -> ${to}`);
+    console.info(text || html);
+    return { simulated: true };
+  }
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+    to,
+    subject,
+    html,
+    text,
+  });
+  return { simulated: false };
+};
+const saveCode = async (userId, code, tableName, expiryMinutes, hashColumn) => {
+  const codeHash = hashValue(code);
+  const expiresSql = `datetime('now', '+${expiryMinutes} minutes')`;
+  await run(`DELETE FROM ${tableName} WHERE user_id=?`, [userId]);
+  await run(
+    `INSERT INTO ${tableName}(user_id,${hashColumn},expires_at) VALUES(?,?,${expiresSql})`,
+    [userId, codeHash],
+  );
+};
+const verifyStoredCode = async (userId, code, tableName, hashColumn) => {
+  const record = await get(
+    `SELECT * FROM ${tableName} WHERE user_id=? AND expires_at > CURRENT_TIMESTAMP ORDER BY created_at DESC LIMIT 1`,
+    [userId],
+  );
+  if (!record) return false;
+  return hashValue(code) === record[hashColumn];
+};
+const sendResetCode = async (user) => {
+  const code = codeFrom();
+  await saveCode(user.id, code, "password_resets", 15, "token_hash");
+  await sendEmail({
+    to: user.email,
+    subject: "Reset your AJ Tech password",
+    text: `Your AJ Tech password reset code is ${code}. It expires in 15 minutes.`,
+    html: `<p>Your AJ Tech password reset code is <strong>${code}</strong>.</p><p>It expires in 15 minutes.</p>`,
+  });
+  return code;
+};
 exports.register = async (req, res, next) => {
   try {
     const {
@@ -153,48 +215,43 @@ exports.forgot = async (req, res, next) => {
     const { email } = req.body;
     if (!validator.isEmail(email || ""))
       return res.status(400).json({ message: "Enter a valid email address." });
-    const user = await get("SELECT id FROM users WHERE email=?", [
+    const user = await get("SELECT id,email FROM users WHERE email=?", [
       email.toLowerCase(),
     ]);
     if (user) {
-      const token = crypto.randomBytes(32).toString("hex"),
-        tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-      await run("DELETE FROM password_resets WHERE user_id=?", [user.id]);
-      await run(
-        "INSERT INTO password_resets(user_id,token_hash,expires_at) VALUES(?,?,datetime('now', '+30 minutes'))",
-        [user.id, tokenHash],
-      );
-      console.info(
-        `Password reset link (configure email in production): ${process.env.APP_URL || "http://localhost:3000"}/reset-password.html?token=${token}`,
-      );
+      await sendResetCode(user);
     }
-    res.json({ message: "If an account exists, a reset link has been sent." });
+    res.json({ message: "If an account exists, a 6-digit reset code has been sent to the email on file." });
   } catch (e) {
     next(e);
   }
 };
 exports.reset = async (req, res, next) => {
   try {
-    const { token, password, confirmPassword } = req.body;
-    if (!token || !strong(password) || password !== confirmPassword)
+    const { email, code, token, password, confirmPassword } = req.body;
+    const resetCode = code || token;
+    if (!validator.isEmail(email || "") || !resetCode || !password || !confirmPassword)
       return res
         .status(400)
-        .json({ message: "Use a valid token and a strong matching password." });
-    const h = crypto.createHash("sha256").update(token).digest("hex");
-    const reset = await get(
-      "SELECT * FROM password_resets WHERE token_hash=? AND expires_at > CURRENT_TIMESTAMP",
-      [h],
-    );
-    if (!reset)
+        .json({ message: "Use a valid email, code, and matching password." });
+    if (!strong(password) || password !== confirmPassword)
       return res
         .status(400)
-        .json({ message: "This reset link is invalid or has expired." });
+        .json({ message: "Use a strong password and make sure both fields match." });
+    const user = await get("SELECT id FROM users WHERE email=?", [
+      email.toLowerCase(),
+    ]);
+    if (!user)
+      return res.status(404).json({ message: "Account not found." });
+    const valid = await verifyStoredCode(user.id, resetCode, "password_resets", "token_hash");
+    if (!valid)
+      return res.status(400).json({ message: "This reset code is invalid or has expired." });
     await run(
       "UPDATE users SET password_hash=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
-      [await bcrypt.hash(password, 12), reset.user_id],
+      [await bcrypt.hash(password, 12), user.id],
     );
-    await run("DELETE FROM password_resets WHERE user_id=?", [reset.user_id]);
-    await run("DELETE FROM user_sessions WHERE user_id=?", [reset.user_id]);
+    await run("DELETE FROM password_resets WHERE user_id=?", [user.id]);
+    await run("DELETE FROM user_sessions WHERE user_id=?", [user.id]);
     res.json({ message: "Password changed. Please sign in again." });
   } catch (e) {
     next(e);
