@@ -116,7 +116,7 @@ exports.supportConversations = async (req, res) =>
       `SELECT m.client_id, u.full_name, u.email, MAX(m.created_at) AS last_message_at,
        (SELECT body FROM support_messages latest WHERE latest.client_id=m.client_id ORDER BY latest.created_at DESC, latest.id DESC LIMIT 1) AS last_message
        FROM support_messages m JOIN users u ON u.id=m.client_id
-       GROUP BY m.client_id ORDER BY last_message_at DESC`,
+      GROUP BY m.client_id, u.full_name, u.email ORDER BY last_message_at DESC`,
     ),
   });
 exports.conversationMessages = async (req, res) =>

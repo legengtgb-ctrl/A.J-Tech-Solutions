@@ -21,6 +21,8 @@ services:
         sync: false
       - key: SUPER_ADMIN_PASSWORD
         sync: false
+      - key: CLOUDINARY_URL
+        sync: false
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT

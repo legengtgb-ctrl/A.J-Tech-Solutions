@@ -55,6 +55,9 @@ app.use("/api/admin", require("./server/routes/adminRoutes"));
 app.use("/api/super-admin", require("./server/routes/superAdminRoutes"));
 app.use("/uploads", express.static(uploads));
 app.use("/img", express.static(path.join(__dirname, "img")));
+app.get(["/portal", "/portal/"], (req, res) =>
+  res.redirect("/dashboard.html"),
+);
 app.use("/portal", express.static(path.join(__dirname, "AJ user auth")));
 // The public entry point is always the sign-in screen. Dashboard pages remain
 // available only after their own authenticated API checks succeed.
@@ -64,6 +67,8 @@ app.use((err, req, res, next) => {
   console.error(err);
   if (err.code === "LIMIT_FILE_SIZE")
     return res.status(400).json({ message: "Image must be 2 MB or smaller." });
+  if (err.statusCode === 503)
+    return res.status(503).json({ message: err.message });
   res.status(500).json({ message: "Something went wrong. Please try again." });
 });
 initialize()
