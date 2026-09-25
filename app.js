@@ -55,9 +55,6 @@ app.use("/api/admin", require("./server/routes/adminRoutes"));
 app.use("/api/super-admin", require("./server/routes/superAdminRoutes"));
 app.use("/uploads", express.static(uploads));
 app.use("/img", express.static(path.join(__dirname, "img")));
-app.get(["/portal", "/portal/"], (req, res) =>
-  res.redirect("/dashboard.html"),
-);
 app.use("/portal", express.static(path.join(__dirname, "AJ user auth")));
 // The public entry point is always the sign-in screen. Dashboard pages remain
 // available only after their own authenticated API checks succeed.

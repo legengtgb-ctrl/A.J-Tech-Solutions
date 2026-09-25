@@ -195,7 +195,7 @@ exports.login = async (req, res, next) => {
           ? "/super-admin-dashboard.html"
           : user.role === "admin"
             ? "/admin-dashboard.html"
-            : "/dashboard.html",
+            : "/portal/",
     });
   } catch (e) {
     next(e);
